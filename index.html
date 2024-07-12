@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Truth Table Calculator</title>
+    <link rel="stylesheet" href="https://unpkg.com/simpledotcss/simple.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 50px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+           .sortable-table th {
+            cursor: pointer;
+            position: relative;
+        }
+        .sortable-table th:after {
+            content: '↕'; /* Up/Down arrow symbol */
+            font-size: 0.75em;
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .sortable-table th.sorted-asc:after {
+            content: '↑'; /* Up arrow symbol */
+        }
+        .sortable-table th.sorted-desc:after {
+            content: '↓'; /* Down arrow symbol */
+        }
+        input[type="text"] {
+            width: 50%;
+            box-sizing: border-box;
+        }
+        button {
+            margin-top: 10px;
+        }
+        /* CSS file */
+        .true {
+            background-color: #ace894;
+        }
+
+        .false {
+            background-color: #d64045;
+        }
+        .radio-container {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Truth Table Calculator</h1>
+    <table id="variableTable">
+        <thead>
+            <tr>
+                <th>Property</th>
+                <th>Display Name</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    <button onclick="addVariableRow()">Add Property</button>
+    <br>
+    <label for="logicInput">Custom logic:</label>
+    <input type="text" id="logicInput" placeholder="Enter logic expression (e.g., A OR B)">
+    <button onclick="calculateTruthTable()">Calculate Truth Table</button>
+    <h2>Truth Table</h2>
+    <div class="radio-container">
+        <p><b>Result column filtering:</b></p>
+<input type="radio" id="showAll" name="filter" value="all" checked onclick="filterTable()">
+<label for="showAll">Show All</label>
+<input type="radio" id="showTrue" name="filter" value="true" onclick="filterTable()">
+<label for="showTrue">Show only true</label>
+<input type="radio" id="showFalse" name="filter" value="false" onclick="filterTable()">
+<label for="showFalse">Show only false</label>
+ </div>
+     <div class="radio-container">
+         <p><b>Break-the-Glass flavor:</b></p>
+    <input type="radio" id="displayDefault" name="resultDisplay" value="default" checked onclick="updateResultDisplay()">
+    <label for="displayDefault">Default</label>
+    <input type="radio" id="displayAppropriate" name="resultDisplay" value="appropriate" onclick="updateResultDisplay()">
+    <label for="displayAppropriate">Appropriate</label>
+    <input type="radio" id="displayInappropriate" name="resultDisplay" value="inappropriate" onclick="updateResultDisplay()">
+    <label for="displayInappropriate">Inappropriate</label>
+ </div>
+    
+    <div id="truthTableOutput"></div>
+    <script>
+        let variableCount = 0;
+
+        function addVariableRow() {
+            const variableTableBody = document.getElementById('variableTable').querySelector('tbody');
+            const row = document.createElement('tr');
+            const variableName = String.fromCharCode(65 + variableCount); // 'A', 'B', 'C', etc.
+
+            row.innerHTML = `
+                <td>${variableName}</td>
+                <td><input type="text" data-variable="${variableName}" placeholder="Display name for ${variableName}"></td>
+            `;
+
+            variableTableBody.appendChild(row);
+            variableCount++;
+        }
+
+        function getUniqueVariables(expression) {
+            const regex = /\b[A-Z]\b/g;
+            const variables = new Set(expression.match(regex));
+            return Array.from(variables);
+        }
+
+        function generateCombinations(variables) {
+            const combinations = [];
+            const numCombinations = Math.pow(2, variables.length);
+            for (let i = 0; i < numCombinations; i++) {
+                const combination = {};
+                variables.forEach((variable, index) => {
+                    combination[variable] = (i >> index) & 1;
+                });
+                combinations.push(combination);
+            }
+            return combinations;
+        }
+
+        function evaluateExpression(expression, combination) {
+            const evalExpression = expression.replace(/\b[A-Z]\b/g, (match) => combination[match]);
+            return eval(evalExpression.replace(/AND/g, '&&').replace(/OR/g, '||').replace(/NOT/g, '!'));
+        }
+
+        function calculateTruthTable() {
+                    const displayNames = {};
+            document.querySelectorAll('input[data-variable]').forEach(input => {
+                const variable = input.getAttribute('data-variable');
+                displayNames[variable] = input.value || variable;
+            });
+
+            const logicInput = document.getElementById('logicInput').value.toUpperCase();
+                    // filter out properties not in table
+                    const variables = getUniqueVariables(logicInput).filter(element => element in displayNames);
+            console.log("variables: " + variables)
+            const combinations = generateCombinations(variables);
+
+            
+
+            const table = combinations.map(combination => {
+                const result = evaluateExpression(logicInput, combination);
+                const displayCombination = {};
+                for (const [key, value] of Object.entries(combination)) {
+                    displayCombination[displayNames[key]] = value ? 'true' : 'false';
+                }
+                return { ...displayCombination, result: result ? 'true' : 'false' };
+            });
+
+            displayTruthTable(variables, table, displayNames);
+        }
+
+        function displayTruthTable(variables, table, displayNames) {
+            const outputDiv = document.getElementById('truthTableOutput');
+            outputDiv.innerHTML = '';
+
+            const tableElement = document.createElement('table');
+                    tableElement.classList.add('sortable-table');
+            const thead = document.createElement('thead');
+            const tbody = document.createElement('tbody');
+
+            const headerRow = document.createElement('tr');
+            variables.forEach(variable => {
+                const th = document.createElement('th');
+                th.textContent = displayNames[variable];
+                th.onclick = () => sortTable(th, displayNames[variable]);
+                headerRow.appendChild(th);
+            });
+            const resultHeader = document.createElement('th');
+            resultHeader.textContent = 'Result';
+            resultHeader.onclick = () => sortTable(resultHeader, 'result');        
+            headerRow.appendChild(resultHeader);
+            thead.appendChild(headerRow);
+
+            table.forEach(row => {
+                const tr = document.createElement('tr');
+                variables.forEach(variable => {
+                    const td = document.createElement('td');
+                    td.textContent = row[displayNames[variable]];
+                    tr.appendChild(td);
+                });
+                const resultTd = document.createElement('td');
+                resultTd.textContent = row.result;
+                // Apply conditional styling using CSS classes
+                if (row.result === "true") {
+                    resultTd.classList.add('true');
+                } else if (row.result === "false") {
+                    resultTd.classList.add('false');
+                }
+                tr.appendChild(resultTd);
+                tbody.appendChild(tr);
+            });
+
+            tableElement.appendChild(thead);
+            tableElement.appendChild(tbody);
+            outputDiv.appendChild(tableElement);
+        }
+            function sortTable(header, column) {
+            const table = header.parentElement.parentElement.parentElement;
+            const rows = Array.from(table.querySelector('tbody').rows);
+            const ascending = !header.ascending;
+            header.ascending = ascending;
+
+            rows.sort((a, b) => {
+                const cellA = a.querySelector(`td:nth-child(${header.cellIndex + 1})`).textContent;
+                const cellB = b.querySelector(`td:nth-child(${header.cellIndex + 1})`).textContent;
+
+                if (cellA === cellB) return 0;
+                return (cellA < cellB ? -1 : 1) * (ascending ? 1 : -1);
+            });
+
+            rows.forEach(row => table.querySelector('tbody').appendChild(row));
+
+            // Update header classes to show sort direction
+            Array.from(header.parentElement.children).forEach(th => th.classList.remove('sorted-asc', 'sorted-desc'));
+            header.classList.add(ascending ? 'sorted-asc' : 'sorted-desc');
+        }
+function filterTable() {
+    const filterValue = document.querySelector('input[name="filter"]:checked').value;
+    const table = document.getElementById('truthTableOutput').querySelector('table');
+    const rows = table.querySelector('tbody').rows;
+
+    Array.from(rows).forEach(row => {
+        const resultCell = row.querySelector('td:last-child').textContent;
+        if (filterValue === 'all' || resultCell === filterValue) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+function formatResult(result) {
+    const displayOption = document.querySelector('input[name="resultDisplay"]:checked').value;
+    if (displayOption === 'appropriate') {
+        return result === 'true' ? 'Grant access' : 'Not grant access';
+    } else if (displayOption === 'inappropriate') {
+        return result === 'true' ? 'Block access' : 'Not block access';
+    } else {
+        return result;
+    }
+}
+function updateResultDisplay() {
+    const table = document.getElementById('truthTableOutput').querySelector('table');
+    const rows = table.querySelector('tbody').rows;
+    Array.from(rows).forEach(row => {
+        const resultTd = row.querySelector('td:last-child');
+        const originalResult = resultTd.classList.contains('true') ? 'true' : 'false';
+        resultTd.textContent = formatResult(originalResult);
+    });
+}
+        
+    </script>
+</body>
+</html>
+
